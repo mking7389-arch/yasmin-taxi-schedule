@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{uid} {
+      // Användare kan läsa sin egen profil. Admin kan läsa alla profiler.
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      // Roller och användardokument hanteras endast av administratör.
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /schedules/{scheduleId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.employeeId == request.auth.uid);
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
