@@ -1,36 +1,69 @@
-# Yasmin Taxi – schemaapp
+# Yasmin Taxi – schema och personal
 
-Flutter-app för iOS och Android där anställda loggar in och ser sina arbetspass. Administratörer kan lägga in och ta bort pass. Backend är Firebase Authentication och Cloud Firestore.
+Mobilanpassad webbapp för Yasmin Taxi. Anställda loggar in och ser sina arbetspass. Administratören ser veckoschemat med en egen färg för varje anställd och kan lägga till eller ta bort pass. Webbappen fungerar i webbläsaren på iPhone, Android och dator.
 
-## Kom igång
+## Publicera webbappen
 
-1. Installera [Flutter](https://docs.flutter.dev/get-started/install) och skapa ett Firebase-projekt.
-2. Aktivera **Authentication → Email/Password** och skapa en **Cloud Firestore**-databas.
-3. Installera FlutterFire CLI och konfigurera projektet från repo-roten:
+Först behöver du ett Firebase-projekt (gratisnivån räcker för att börja):
+
+1. Öppna [Firebase Console](https://console.firebase.google.com/) och skapa projektet.
+2. I projektinställningarna lägg till en **Web App** (`</>`). Kopiera dess konfigurationsvärden.
+3. Gå till **Authentication → Sign-in method** och aktivera **Email/Password**.
+4. Gå till **Firestore Database** och skapa en databas.
+5. I repot öppna **Settings → Secrets and variables → Actions → New repository secret**. Lägg till dessa sex secrets med värden från Firebase web app:
+   - `NEXT_PUBLIC_FIREBASE_API_KEY`
+   - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+   - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+   - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+   - `NEXT_PUBLIC_FIREBASE_APP_ID`
+6. Kör publiceringen från terminalen med Node.js installerat:
 
    ```bash
-   dart pub global activate flutterfire_cli
-   flutterfire configure
+   cp .env.example .env.local
+   # Fyll i värdena från Firebase i .env.local
+   npm install
+   npm run build
+   npx firebase-tools login
+   npx firebase-tools deploy --only hosting
    ```
 
-   Välj iOS och Android. Kommandot skapar `lib/firebase_options.dart` (den filen är projektspecifik och ska inte hittas på eller checkas in med hemliga servernycklar).
-4. Lägg till initiering i `lib/main.dart` genom att importera `firebase_options.dart` och använd `Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)`. Alternativt följ FlutterFire-guiden för plattformarnas native-konfiguration.
-5. Publicera reglerna i `firestore.rules` till Firestore (Firebase Console → Firestore → Rules).
-6. Kör `flutter pub get` och `flutter run`.
+   Firebase hosting är konfigurerat att publicera den statiska webbappen från `out/`. Firebase visar webbplatsens adress efter publicering. Lägg också till den domänen i **Authentication → Settings → Authorized domains** om det behövs.
 
-## Första admin och anställdkonton
+   Obs: värdena i Firebase web app-konfigurationen används av klientappen. Säkerheten kommer från Authentication och Firestore-reglerna, inte från att gömma web app-konfigurationen. Publicera aldrig Firebase Admin service-account-nycklar i repot.
 
-Skapa konton i Firebase Console → Authentication → Users med e-post och lösenord. Skapa sedan dokument i Firestore-kollektionen `users`, med dokument-ID lika med användarens Authentication UID:
+## Skapa administratör och anställda
+
+Konton skapas i Firebase Console → **Authentication → Users → Add user**. För varje konto, kopiera dess UID och skapa i Firestore ett dokument i `users` med dokument-ID exakt lika med UID:
 
 ```json
-{"role":"admin","name":"Yasmin"}
+{"name":"Yasmin","email":"yasmin@example.com","role":"admin"}
 ```
 
-För anställda, använd `role: "employee"`. Administratörer kan skapa arbetspass genom att ange den anställdes UID i appen. Anställda ser endast pass där `employeeId` är deras eget UID. Skapa aldrig adminrollen från en oskyddad klient; rollen sätts av en betrodd administratör i Firebase Console.
+För anställda används `"role":"employee"`, till exempel:
 
-## Datamodell
+```json
+{"name":"Anna Andersson","email":"anna@example.com","role":"employee"}
+```
 
-- `users/{uid}`: `role` (`admin` eller `employee`), valfritt `name`.
-- `schedules/{id}`: `employeeId`, `employeeName`, `startAt`, `endAt`, `note`, `createdAt`.
+Adminrollen ska skapas manuellt av en betrodd projektägare i Firebase Console. Webbappen låter inte användare själva registrera sig eller ge sig adminbehörighet. När anställdkontona har skapats visas deras namn i adminens färgkodade schema och i listan när ett nytt pass läggs till.
 
-Appen är en startversion. Lägg till Firebase-konfiguration för ditt eget projekt innan du kör den.
+## Firestore-datamodell
+
+- `users/{uid}`: `name`, `email`, `role` (`admin` eller `employee`).
+- `schedules/{id}`: `employeeId`, `employeeName`, `startAt`, `endAt`, `note`, `createdAt`, `createdBy`.
+
+Publicera säkerhetsreglerna från `firestore.rules` till Firestore → **Rules**. Reglerna gör att en anställd bara kan läsa egna pass och att endast administratörer får hantera scheman.
+
+## Lokal utveckling
+
+Skapa `.env.local` från `.env.example`, fyll i Firebase-värdena och kör:
+
+```bash
+npm install
+npm run dev
+```
+
+Öppna `http://localhost:3000`. Webbappen visar en konfigurationsguide tills Firebase-värdena finns.
+
+Den befintliga Flutter-startversionen ligger kvar i `lib/` och `pubspec.yaml`.
